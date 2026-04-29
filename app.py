@@ -104,6 +104,7 @@ def search():
         "no_warnings": True,
         "extract_flat": "in_playlist",
         "skip_download": True,
+        "extractor_args": {"youtube": {"player_client": ["ios", "web"]}},
     }
 
     search_query = f"ytsearch20:{query} official"
@@ -152,6 +153,7 @@ def artist():
         "no_warnings": True,
         "extract_flat": "in_playlist",
         "skip_download": True,
+        "extractor_args": {"youtube": {"player_client": ["ios", "web"]}},
     }
 
     search_query = f"ytsearch30:{name} official audio"
@@ -182,6 +184,7 @@ def artist():
         "quiet": True,
         "no_warnings": True,
         "skip_download": True,
+        "extractor_args": {"youtube": {"player_client": ["ios", "web"]}},
     }
 
     def fetch_album(entry):
@@ -240,6 +243,7 @@ def stream():
         "quiet": True,
         "no_warnings": True,
         "skip_download": True,
+        "extractor_args": {"youtube": {"player_client": ["ios", "web"]}},
     }
 
     try:
