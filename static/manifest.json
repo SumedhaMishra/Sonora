@@ -1,0 +1,17 @@
+{
+  "name": "Sonora",
+  "short_name": "Sonora",
+  "description": "Stream music instantly",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8e8ee",
+  "theme_color": "#f472b6",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://tse2.mm.bing.net/th/id/OIP.rQ_DpU1pU7BrgxrW0MxnQQAAAA?r=0&rs=1&pid=ImgDetMain&o=7&rm=3",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    }
+  ]
+}

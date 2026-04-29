@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sonora</title>
     <link rel="icon" type="image/jpeg" href="https://tse2.mm.bing.net/th/id/OIP.IigKW_uqkI4ZzCpnGWbh3gAAAA?r=0&rs=1&pid=ImgDetMain&o=7&rm=3">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#f472b6">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Sonora">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -1749,6 +1754,28 @@
         searchInput.value = urlQ;
         doSearch(false);
     }
+
+    // ========== PWA & MEDIA SESSION ==========
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+    }
+
+    function updateMediaSession(title, artist) {
+        if (!('mediaSession' in navigator)) return;
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: title || 'Sonora',
+            artist: artist || '',
+            album: 'Sonora',
+        });
+        navigator.mediaSession.setActionHandler('play', () => { audioPlayer.play(); togglePlayPause(); });
+        navigator.mediaSession.setActionHandler('pause', () => { audioPlayer.pause(); togglePlayPause(); });
+        navigator.mediaSession.setActionHandler('nexttrack', () => { playNextInPlaylist(); });
+    }
+
+    // Hook media session into play events
+    audioPlayer.addEventListener('play', () => {
+        updateMediaSession(pTitle.textContent, pChannel.textContent);
+    });
 </script>
 </body>
 </html>
