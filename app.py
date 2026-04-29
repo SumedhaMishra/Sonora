@@ -232,32 +232,16 @@ def stream():
     video_id = data.get("id", "").strip()
     title = data.get("title", "audio").strip()
 
-    # Validate video_id format (YouTube IDs are 11 chars, alphanumeric + - + _)
     if not video_id or not re.match(r'^[a-zA-Z0-9_-]{8,15}$', video_id):
         return jsonify({"error": "Invalid video ID."}), 400
 
-    return jsonify({"video_id": video_id, "title": title})
-
-
-@app.route("/api/audio/<video_id>")
-def audio_proxy(video_id):
-    """Proxy audio stream from YouTube through our server.
-    This lets the browser's native <audio> element play it,
-    which supports background/lock-screen playback."""
     import yt_dlp
-    import requests as http_requests
-    from flask import Response
 
-    if not video_id or not re.match(r'^[a-zA-Z0-9_-]{8,15}$', video_id):
-        return "Invalid ID", 400
-
-    # Extract direct audio URL
     ydl_opts = {
         "format": "bestaudio/best",
         "quiet": True,
         "no_warnings": True,
         "skip_download": True,
-        "extractor_args": {"youtube": {"player_client": ["ios", "web"]}},
     }
 
     try:
@@ -266,33 +250,11 @@ def audio_proxy(video_id):
             info = ydl.extract_info(url, download=False)
             stream_url = info.get("url")
             if not stream_url:
-                return "No stream found", 500
+                return jsonify({"error": "Could not extract audio stream."}), 500
     except Exception as e:
-        return f"Extraction failed: {e}", 500
+        return jsonify({"error": f"Stream failed: {e}"}), 500
 
-    # Stream the audio through our server
-    try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        r = http_requests.get(stream_url, headers=headers, stream=True, timeout=30)
-
-        def generate():
-            for chunk in r.iter_content(chunk_size=8192):
-                if chunk:
-                    yield chunk
-
-        content_type = r.headers.get("Content-Type", "audio/webm")
-        resp_headers = {
-            "Content-Type": content_type,
-            "Accept-Ranges": "none",
-            "Cache-Control": "no-cache",
-        }
-        content_length = r.headers.get("Content-Length")
-        if content_length:
-            resp_headers["Content-Length"] = content_length
-
-        return Response(generate(), status=200, headers=resp_headers)
-    except Exception as e:
-        return f"Proxy failed: {e}", 500
+    return jsonify({"stream_url": stream_url, "title": title})
 
 
 if __name__ == "__main__":

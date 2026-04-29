@@ -1366,7 +1366,7 @@
             const data = await resp.json();
             if (!resp.ok) throw new Error(data.error || 'Stream failed');
 
-            audioPlayer.src = `/api/audio/${data.video_id}`;
+            audioPlayer.src = data.stream_url;
             pTitle.textContent = data.title;
             pChannel.textContent = channel;
             player.classList.add('active');
@@ -1551,7 +1551,7 @@
             const data = await resp.json();
             if (!resp.ok) throw new Error(data.error || 'Stream failed');
 
-            audioPlayer.src = `/api/audio/${data.video_id}`;
+            audioPlayer.src = data.stream_url;
             pTitle.textContent = data.title;
             pChannel.textContent = song.channel;
             player.classList.add('active');
