@@ -1239,7 +1239,58 @@
     function playVideoById(videoId) {
         if (!ytReady || !ytPlayer) return;
         ytPlayer.loadVideoById({ videoId: videoId, suggestedQuality: 'tiny' });
+        acquireWakeLock();
     }
+
+    // ========== BACKGROUND PLAYBACK WORKAROUNDS ==========
+
+    // 1. Wake Lock - prevents screen from sleeping
+    let wakeLock = null;
+    async function acquireWakeLock() {
+        try {
+            if ('wakeLock' in navigator) {
+                wakeLock = await navigator.wakeLock.request('screen');
+            }
+        } catch(_) {}
+    }
+    function releaseWakeLock() {
+        if (wakeLock) { wakeLock.release().catch(()=>{}); wakeLock = null; }
+    }
+
+    // 2. Silent audio keep-alive - keeps audio session active when minimized
+    const silentAudio = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');
+    silentAudio.loop = true;
+    silentAudio.volume = 0.01;
+
+    // 3. Visibility change - resume YouTube when tab becomes hidden/visible
+    document.addEventListener('visibilitychange', () => {
+        if (!ytPlayer || !currentSongId) return;
+        if (document.hidden) {
+            // Tab hidden: start silent audio to keep audio session, try to resume YT
+            silentAudio.play().catch(()=>{});
+            setTimeout(() => {
+                if (ytPlayer && ytPlayer.getPlayerState && ytPlayer.getPlayerState() === YT.PlayerState.PAUSED) {
+                    ytPlayer.playVideo();
+                }
+            }, 200);
+            // Keep retrying in case YouTube pauses it
+            const resumeCheck = setInterval(() => {
+                if (!currentSongId || !document.hidden) { clearInterval(resumeCheck); return; }
+                if (ytPlayer && ytPlayer.getPlayerState && ytPlayer.getPlayerState() === YT.PlayerState.PAUSED) {
+                    ytPlayer.playVideo();
+                }
+            }, 1000);
+        } else {
+            // Tab visible again
+            silentAudio.pause();
+            acquireWakeLock();
+        }
+    });
+
+    // Re-acquire wake lock when screen turns back on
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && currentSongId) acquireWakeLock();
+    });
 
     // ========== VIEW NAVIGATION ==========
     function showLanding() {
@@ -1451,6 +1502,8 @@
     function closePlayer() {
         if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo();
         stopProgressTracking();
+        releaseWakeLock();
+        silentAudio.pause();
         player.classList.remove('active');
         currentSongId = null;
         playlistIndex = -1;
