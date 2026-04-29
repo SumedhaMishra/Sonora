@@ -238,23 +238,43 @@ def stream():
 
     import yt_dlp
 
-    ydl_opts = {
-        "format": "bestaudio/best",
-        "quiet": True,
-        "no_warnings": True,
-        "skip_download": True,
-        "extractor_args": {"youtube": {"player_client": ["ios", "web"]}},
-    }
+    # Try multiple client strategies to bypass YouTube bot detection on servers
+    clients_to_try = [
+        ["android_creator", "web"],
+        ["ios", "web"],
+        ["mweb"],
+        ["web_creator"],
+    ]
 
-    try:
-        url = f"https://www.youtube.com/watch?v={video_id}"
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            stream_url = info.get("url")
-            if not stream_url:
-                return jsonify({"error": "Could not extract audio stream."}), 500
-    except Exception as e:
-        return jsonify({"error": f"Stream failed: {e}"}), 500
+    stream_url = None
+    last_error = ""
+
+    for clients in clients_to_try:
+        ydl_opts = {
+            "format": "bestaudio/best",
+            "quiet": True,
+            "no_warnings": True,
+            "skip_download": True,
+            "extractor_args": {"youtube": {"player_client": clients}},
+            "http_headers": {
+                "User-Agent": "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36",
+            },
+            "geo_bypass": True,
+        }
+
+        try:
+            url = f"https://www.youtube.com/watch?v={video_id}"
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                stream_url = info.get("url")
+                if stream_url:
+                    break
+        except Exception as e:
+            last_error = str(e)
+            continue
+
+    if not stream_url:
+        return jsonify({"error": f"Stream failed: {last_error}"}), 500
 
     return jsonify({"stream_url": stream_url, "title": title})
 
