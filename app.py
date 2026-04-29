@@ -236,47 +236,10 @@ def stream():
     if not video_id or not re.match(r'^[a-zA-Z0-9_-]{8,15}$', video_id):
         return jsonify({"error": "Invalid video ID."}), 400
 
-    import yt_dlp
+    # Return embed URL — YouTube's official embed API, never gets blocked
+    embed_url = f"https://www.youtube.com/embed/{video_id}?autoplay=1&rel=0"
 
-    # Try multiple client strategies to bypass YouTube bot detection on servers
-    clients_to_try = [
-        ["android_creator", "web"],
-        ["ios", "web"],
-        ["mweb"],
-        ["web_creator"],
-    ]
-
-    stream_url = None
-    last_error = ""
-
-    for clients in clients_to_try:
-        ydl_opts = {
-            "format": "bestaudio/best",
-            "quiet": True,
-            "no_warnings": True,
-            "skip_download": True,
-            "extractor_args": {"youtube": {"player_client": clients}},
-            "http_headers": {
-                "User-Agent": "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36",
-            },
-            "geo_bypass": True,
-        }
-
-        try:
-            url = f"https://www.youtube.com/watch?v={video_id}"
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                stream_url = info.get("url")
-                if stream_url:
-                    break
-        except Exception as e:
-            last_error = str(e)
-            continue
-
-    if not stream_url:
-        return jsonify({"error": f"Stream failed: {last_error}"}), 500
-
-    return jsonify({"stream_url": stream_url, "title": title})
+    return jsonify({"embed_url": embed_url, "video_id": video_id, "title": title})
 
 
 if __name__ == "__main__":

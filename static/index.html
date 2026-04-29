@@ -1142,28 +1142,17 @@
 
 <!-- Player -->
 <div class="player" id="player">
-    <div class="player-progress" id="progressBar" onclick="seekAudio(event)">
-        <div class="player-progress-fill" id="progressFill"></div>
-    </div>
     <div class="player-inner">
         <div class="player-info">
             <div class="p-title" id="pTitle">&mdash;</div>
             <div class="p-sub" id="pChannel"></div>
         </div>
-        <div class="player-controls">
-            <button class="ctrl-btn main-ctrl" id="playPauseBtn" onclick="togglePlayPause()">
-                <svg id="iconPause" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
-                <svg id="iconPlay" viewBox="0 0 24 24" fill="currentColor" style="display:none"><polygon points="5,3 19,12 5,21"/></svg>
-            </button>
-        </div>
-        <div class="player-time" id="playerTime">0:00 / 0:00</div>
         <button class="player-close" onclick="closePlayer()" title="Close">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
     </div>
+    <iframe id="ytEmbed" width="100%" height="80" style="border:none; display:block;" allow="autoplay; encrypted-media" allowfullscreen></iframe>
 </div>
-
-<audio id="audioPlayer"></audio>
 
 <script>
     const searchInput = document.getElementById('searchInput');
@@ -1173,13 +1162,9 @@
     const emptyState = document.getElementById('emptyState');
     const spinnerEl = document.getElementById('spinner');
     const player = document.getElementById('player');
-    const audioPlayer = document.getElementById('audioPlayer');
+    const ytEmbed = document.getElementById('ytEmbed');
     const pTitle = document.getElementById('pTitle');
     const pChannel = document.getElementById('pChannel');
-    const progressFill = document.getElementById('progressFill');
-    const playerTime = document.getElementById('playerTime');
-    const iconPlay = document.getElementById('iconPlay');
-    const iconPause = document.getElementById('iconPause');
 
     let currentSongId = null;
 
@@ -1353,19 +1338,15 @@
             const data = await resp.json();
             if (!resp.ok) throw new Error(data.error || 'Stream failed');
 
-            audioPlayer.src = data.stream_url;
+            ytEmbed.src = data.embed_url;
             pTitle.textContent = data.title;
             pChannel.textContent = channel;
             player.classList.add('active');
-            audioPlayer.play();
             currentSongId = id;
 
             // Update button states
             allBtns.forEach(b => b.classList.remove('active-song'));
             btn.classList.add('active-song');
-
-            iconPause.style.display = '';
-            iconPlay.style.display = 'none';
         } catch (err) {
             statusEl.className = 'status error';
             statusEl.textContent = err.message;
@@ -1378,41 +1359,15 @@
     }
 
     function togglePlayPause() {
-        if (audioPlayer.paused) {
-            audioPlayer.play();
-            iconPause.style.display = '';
-            iconPlay.style.display = 'none';
-        } else {
-            audioPlayer.pause();
-            iconPause.style.display = 'none';
-            iconPlay.style.display = '';
-        }
+        // Controlled by YouTube embed
     }
 
     function seekAudio(e) {
-        if (!audioPlayer.duration) return;
-        const rect = e.currentTarget.getBoundingClientRect();
-        const pct = (e.clientX - rect.left) / rect.width;
-        audioPlayer.currentTime = pct * audioPlayer.duration;
+        // Controlled by YouTube embed
     }
 
-    audioPlayer.addEventListener('timeupdate', () => {
-        if (!audioPlayer.duration) return;
-        const pct = (audioPlayer.currentTime / audioPlayer.duration) * 100;
-        progressFill.style.width = pct + '%';
-        playerTime.textContent = `${formatDuration(audioPlayer.currentTime)} / ${formatDuration(audioPlayer.duration)}`;
-    });
-
-    audioPlayer.addEventListener('ended', () => {
-        iconPause.style.display = 'none';
-        iconPlay.style.display = '';
-        progressFill.style.width = '0%';
-        playNextInPlaylist();
-    });
-
     function closePlayer() {
-        audioPlayer.pause();
-        audioPlayer.src = '';
+        ytEmbed.src = '';
         player.classList.remove('active');
         currentSongId = null;
         playlistIndex = -1;
@@ -1551,18 +1506,15 @@
             const data = await resp.json();
             if (!resp.ok) throw new Error(data.error || 'Stream failed');
 
-            audioPlayer.src = data.stream_url;
+            ytEmbed.src = data.embed_url;
             pTitle.textContent = data.title;
             pChannel.textContent = song.channel;
             player.classList.add('active');
-            audioPlayer.play();
             currentSongId = song.id;
 
             document.querySelectorAll('.play-btn').forEach(b => {
                 b.classList.toggle('active-song', b.dataset.id === song.id);
             });
-            iconPause.style.display = '';
-            iconPlay.style.display = 'none';
             statusEl.textContent = '';
         } catch (err) {
             statusEl.className = 'status error';
@@ -1773,9 +1725,7 @@
     }
 
     // Hook media session into play events
-    audioPlayer.addEventListener('play', () => {
-        updateMediaSession(pTitle.textContent, pChannel.textContent);
-    });
+    // (YouTube embed handles its own playback)
 </script>
 </body>
 </html>
