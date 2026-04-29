@@ -1162,9 +1162,7 @@
         </button>
     </div>
 </div>
-<!-- Hidden YouTube player (audio only, lowest quality) -->
-<div id="ytPlayerWrap" style="position:fixed;top:-10px;left:-10px;width:1px;height:1px;overflow:hidden;pointer-events:none;opacity:0;"><div id="ytPlayer"></div></div>
-<script src="https://www.youtube.com/iframe_api"></script>
+<audio id="audioPlayer"></audio>
 
 <script>
     const searchInput = document.getElementById('searchInput');
@@ -1174,6 +1172,7 @@
     const emptyState = document.getElementById('emptyState');
     const spinnerEl = document.getElementById('spinner');
     const player = document.getElementById('player');
+    const audioPlayer = document.getElementById('audioPlayer');
     const pTitle = document.getElementById('pTitle');
     const pChannel = document.getElementById('pChannel');
     const progressFill = document.getElementById('progressFill');
@@ -1182,114 +1181,19 @@
     const iconPause = document.getElementById('iconPause');
 
     let currentSongId = null;
-    let ytPlayer = null;
-    let ytReady = false;
-    let progressInterval = null;
 
-    // YouTube IFrame Player API
-    window.onYouTubeIframeAPIReady = function() {
-        ytPlayer = new YT.Player('ytPlayer', {
-            height: '1',
-            width: '1',
-            playerVars: {
-                autoplay: 0, controls: 0, disablekb: 1, fs: 0,
-                modestbranding: 1, rel: 0, playsinline: 1,
-            },
-            events: {
-                onReady: function() { ytReady = true; },
-                onStateChange: function(e) {
-                    if (e.data === YT.PlayerState.PLAYING) {
-                        try { ytPlayer.setPlaybackQuality('tiny'); } catch(_) {}
-                        iconPause.style.display = '';
-                        iconPlay.style.display = 'none';
-                        startProgressTracking();
-                    } else if (e.data === YT.PlayerState.PAUSED) {
-                        iconPause.style.display = 'none';
-                        iconPlay.style.display = '';
-                        stopProgressTracking();
-                    } else if (e.data === YT.PlayerState.ENDED) {
-                        iconPause.style.display = 'none';
-                        iconPlay.style.display = '';
-                        progressFill.style.width = '0%';
-                        stopProgressTracking();
-                        playNextInPlaylist();
-                    }
-                },
-            },
-        });
-    };
-
-    function startProgressTracking() {
-        stopProgressTracking();
-        progressInterval = setInterval(() => {
-            if (!ytPlayer || !ytPlayer.getDuration) return;
-            const cur = ytPlayer.getCurrentTime() || 0;
-            const dur = ytPlayer.getDuration() || 0;
-            if (dur > 0) {
-                progressFill.style.width = ((cur / dur) * 100) + '%';
-                playerTime.textContent = formatDuration(cur) + ' / ' + formatDuration(dur);
-            }
-        }, 500);
-    }
-
-    function stopProgressTracking() {
-        if (progressInterval) { clearInterval(progressInterval); progressInterval = null; }
-    }
-
-    function playVideoById(videoId) {
-        if (!ytReady || !ytPlayer) return;
-        ytPlayer.loadVideoById({ videoId: videoId, suggestedQuality: 'tiny' });
-        acquireWakeLock();
-    }
-
-    // ========== BACKGROUND PLAYBACK WORKAROUNDS ==========
-
-    // 1. Wake Lock - prevents screen from sleeping
-    let wakeLock = null;
-    async function acquireWakeLock() {
-        try {
-            if ('wakeLock' in navigator) {
-                wakeLock = await navigator.wakeLock.request('screen');
-            }
-        } catch(_) {}
-    }
-    function releaseWakeLock() {
-        if (wakeLock) { wakeLock.release().catch(()=>{}); wakeLock = null; }
-    }
-
-    // 2. Silent audio keep-alive - keeps audio session active when minimized
-    const silentAudio = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');
-    silentAudio.loop = true;
-    silentAudio.volume = 0.01;
-
-    // 3. Visibility change - resume YouTube when tab becomes hidden/visible
-    document.addEventListener('visibilitychange', () => {
-        if (!ytPlayer || !currentSongId) return;
-        if (document.hidden) {
-            // Tab hidden: start silent audio to keep audio session, try to resume YT
-            silentAudio.play().catch(()=>{});
-            setTimeout(() => {
-                if (ytPlayer && ytPlayer.getPlayerState && ytPlayer.getPlayerState() === YT.PlayerState.PAUSED) {
-                    ytPlayer.playVideo();
-                }
-            }, 200);
-            // Keep retrying in case YouTube pauses it
-            const resumeCheck = setInterval(() => {
-                if (!currentSongId || !document.hidden) { clearInterval(resumeCheck); return; }
-                if (ytPlayer && ytPlayer.getPlayerState && ytPlayer.getPlayerState() === YT.PlayerState.PAUSED) {
-                    ytPlayer.playVideo();
-                }
-            }, 1000);
-        } else {
-            // Tab visible again
-            silentAudio.pause();
-            acquireWakeLock();
-        }
+    audioPlayer.addEventListener('timeupdate', () => {
+        if (!audioPlayer.duration) return;
+        const pct = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+        progressFill.style.width = pct + '%';
+        playerTime.textContent = formatDuration(audioPlayer.currentTime) + ' / ' + formatDuration(audioPlayer.duration);
     });
 
-    // Re-acquire wake lock when screen turns back on
-    document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && currentSongId) acquireWakeLock();
+    audioPlayer.addEventListener('ended', () => {
+        iconPause.style.display = 'none';
+        iconPlay.style.display = '';
+        progressFill.style.width = '0%';
+        playNextInPlaylist();
     });
 
     // ========== VIEW NAVIGATION ==========
@@ -1462,15 +1366,18 @@
             const data = await resp.json();
             if (!resp.ok) throw new Error(data.error || 'Stream failed');
 
-            playVideoById(data.video_id);
+            audioPlayer.src = `/api/audio/${data.video_id}`;
             pTitle.textContent = data.title;
             pChannel.textContent = channel;
             player.classList.add('active');
+            audioPlayer.play();
             currentSongId = id;
 
-            // Update button states
             allBtns.forEach(b => b.classList.remove('active-song'));
             btn.classList.add('active-song');
+
+            iconPause.style.display = '';
+            iconPlay.style.display = 'none';
         } catch (err) {
             statusEl.className = 'status error';
             statusEl.textContent = err.message;
@@ -1483,27 +1390,27 @@
     }
 
     function togglePlayPause() {
-        if (!ytPlayer) return;
-        const state = ytPlayer.getPlayerState();
-        if (state === YT.PlayerState.PLAYING) {
-            ytPlayer.pauseVideo();
+        if (audioPlayer.paused) {
+            audioPlayer.play();
+            iconPause.style.display = '';
+            iconPlay.style.display = 'none';
         } else {
-            ytPlayer.playVideo();
+            audioPlayer.pause();
+            iconPause.style.display = 'none';
+            iconPlay.style.display = '';
         }
     }
 
     function seekAudio(e) {
-        if (!ytPlayer || !ytPlayer.getDuration) return;
+        if (!audioPlayer.duration) return;
         const rect = e.currentTarget.getBoundingClientRect();
         const pct = (e.clientX - rect.left) / rect.width;
-        ytPlayer.seekTo(pct * ytPlayer.getDuration(), true);
+        audioPlayer.currentTime = pct * audioPlayer.duration;
     }
 
     function closePlayer() {
-        if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo();
-        stopProgressTracking();
-        releaseWakeLock();
-        silentAudio.pause();
+        audioPlayer.pause();
+        audioPlayer.src = '';
         player.classList.remove('active');
         currentSongId = null;
         playlistIndex = -1;
@@ -1644,15 +1551,18 @@
             const data = await resp.json();
             if (!resp.ok) throw new Error(data.error || 'Stream failed');
 
-            playVideoById(data.video_id);
+            audioPlayer.src = `/api/audio/${data.video_id}`;
             pTitle.textContent = data.title;
             pChannel.textContent = song.channel;
             player.classList.add('active');
+            audioPlayer.play();
             currentSongId = song.id;
 
             document.querySelectorAll('.play-btn').forEach(b => {
                 b.classList.toggle('active-song', b.dataset.id === song.id);
             });
+            iconPause.style.display = '';
+            iconPlay.style.display = 'none';
             statusEl.textContent = '';
         } catch (err) {
             statusEl.className = 'status error';
@@ -1862,8 +1772,10 @@
         navigator.mediaSession.setActionHandler('nexttrack', () => { playNextInPlaylist(); });
     }
 
-    // Hook media session into play events
-    // (YouTube embed handles its own playback)
+    // Hook media session for lock screen controls
+    audioPlayer.addEventListener('play', () => {
+        updateMediaSession(pTitle.textContent, pChannel.textContent);
+    });
 </script>
 </body>
 </html>
